@@ -155,9 +155,52 @@
   <div class="header-right">
     <span class="meta">Session: <span id="session-date"></span></span>
     <span class="storage-badge"><div class="storage-dot"></div> Saved locally</span>
+    <button class="btn-secondary btn-sm" onclick="toggleSettings()" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);font-size:11px;">⚙ Settings</button>
     <span class="header-badge">DOCUMENT AI</span>
   </div>
 </header>
+
+<!-- Settings panel -->
+<div id="settings-panel" style="display:none;background:#1e2a24;border-bottom:3px solid #2d5a4a;padding:16px 24px;z-index:99;">
+  <div style="max-width:900px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div>
+        <span style="color:white;font-size:14px;font-weight:bold;">⚙ Configuration Settings</span>
+        <span style="color:#81c784;font-size:11px;margin-left:10px;">Stored in your browser only — never in the source code or GitHub</span>
+      </div>
+      <button onclick="toggleSettings()" style="background:transparent;color:rgba(255,255,255,0.6);border:none;cursor:pointer;font-size:18px;line-height:1;">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="form-group">
+        <label style="color:#81c784;font-size:10px;">Zapier Webhook URL</label>
+        <input type="password" id="cfg-zapier" placeholder="https://hooks.zapier.com/hooks/catch/..."
+          style="background:#0d1a14;border-color:#417B68;color:white;font-family:'Courier New',monospace;font-size:11px;">
+        <span style="font-size:10px;color:rgba(255,255,255,0.4);">Paste your Zapier webhook URL. Stored locally only.</span>
+      </div>
+      <div class="form-group">
+        <label style="color:#81c784;font-size:10px;">SharePoint File URI (Document ID Master)</label>
+        <input type="password" id="cfg-sp-uri" placeholder="file:///b!..."
+          style="background:#0d1a14;border-color:#417B68;color:white;font-family:'Courier New',monospace;font-size:11px;">
+        <span style="font-size:10px;color:rgba(255,255,255,0.4);">The M365 drive URI for MVTA_Document_ID_Master.xlsx.</span>
+      </div>
+      <div class="form-group">
+        <label style="color:#81c784;font-size:10px;">SharePoint Intake Form URL (New Request)</label>
+        <input type="text" id="cfg-intake-form" placeholder="https://mvtamn.sharepoint.com/..."
+          style="background:#0d1a14;border-color:#417B68;color:white;font-family:'Courier New',monospace;font-size:11px;">
+      </div>
+      <div class="form-group">
+        <label style="color:#81c784;font-size:10px;">SharePoint Intake Queue URL (Ashley's View)</label>
+        <input type="text" id="cfg-intake-queue" placeholder="https://mvtamn.sharepoint.com/..."
+          style="background:#0d1a14;border-color:#417B68;color:white;font-family:'Courier New',monospace;font-size:11px;">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="btn-primary" onclick="saveAllSettings()">✓ Save Settings</button>
+      <button class="btn-secondary" onclick="toggleSettings()">Cancel</button>
+      <span style="font-size:11px;color:rgba(255,255,255,0.5);">⚠ Do not share your screen or screenshots while this panel is open.</span>
+    </div>
+  </div>
+</div>
 
 <div class="app-body">
 
@@ -252,7 +295,7 @@
         <div style="font-size:12px;color:var(--dark);">
           <strong>Webhook active</strong> — every reserved ID is posted automatically to Zapier,
           which writes it to the Document ID Master list on TransitOperationsHub2.<br>
-          <span style="font-size:11px;color:var(--mid);">Endpoint: hooks.zapier.com/hooks/catch/1838006/42ht8f0/</span>
+          <span style="font-size:11px;color:var(--mid);">Endpoint: <span id='zapier-endpoint-display'>not configured — open Settings</span></span>
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn-secondary btn-sm" onclick="testZapier()">Send Test Record</button>
@@ -845,7 +888,7 @@ function exportCSV() { triggerAutoExport(false); }
 // from SharePoint at session open and on demand. Both Tyre and Ashley see the
 // same sequence state automatically — no manual entry needed.
 
-const SP_FILE_URI = 'file:///b!dJswmUGY1kSMuyGmUw2EM5IkItwwt9ZOmUjansNa3Hq8GwlQbG_tQL8kmTIDrQZq/root:/_SOPs/_Drafts/Raw CSV/MVTA_Document_ID_Master.xlsx';
+const SP_FILE_URI = () => settings.spFileUri || '';
 
 async function syncFromSharePoint(manual = false) {
   setSyncStatus('syncing');
@@ -940,15 +983,15 @@ function setSyncStatus(state) {
 
 
 
-const INTAKE_LIST_URL = 'https://mvtamn.sharepoint.com/sites/TransitOperationsHub2/Lists/Document%20Request%20Intake/NewForm.aspx';
-const INTAKE_QUEUE_URL = 'https://mvtamn.sharepoint.com/sites/TransitOperationsHub2/Lists/Document%20Request%20Intake/AllItems.aspx';
+const INTAKE_LIST_URL = () => settings.intakeFormUrl || 'https://mvtamn.sharepoint.com/sites/TransitOperationsHub2/Lists/Document%20Request%20Intake/NewForm.aspx';
+const INTAKE_QUEUE_URL = () => settings.intakeQueueUrl || 'https://mvtamn.sharepoint.com/sites/TransitOperationsHub2/Lists/Document%20Request%20Intake/AllItems.aspx';
 
 function openSharePointIntake() {
-  window.open(INTAKE_LIST_URL, '_blank');
+  window.open(INTAKE_LIST_URL(), '_blank');
 }
 
 function openSharePointQueue() {
-  window.open(INTAKE_QUEUE_URL, '_blank');
+  window.open(INTAKE_QUEUE_URL(), '_blank');
 }
 
 
@@ -1130,7 +1173,15 @@ function clearQueue() {
 
 
 const STORAGE_SETTINGS = 'mvta_doc_id_settings';
-let settings = { exportFilename: 'MVTA_Document_ID_Master.xlsx', networkPath: '' };
+// Default settings — no sensitive values hardcoded
+// All URLs entered once by admin via Settings panel, stored in localStorage only
+let settings = {
+  exportFilename: 'MVTA_Document_ID_Master.xlsx',
+  zapierUrl: '',
+  spFileUri: '',
+  intakeFormUrl: '',
+  intakeQueueUrl: '',
+};
 
 function autoExportOnSave() { triggerAutoExport(true); }
 
@@ -1138,13 +1189,48 @@ function loadSettings() {
   try {
     const s = localStorage.getItem(STORAGE_SETTINGS);
     if (s) settings = { ...settings, ...JSON.parse(s) };
-    document.getElementById('export-filename').value = settings.exportFilename;
+    const ef = document.getElementById('export-filename');
+    if (ef) ef.value = settings.exportFilename;
+    const ep = document.getElementById('zapier-endpoint-display');
+    if (ep) ep.textContent = settings.zapierUrl
+      ? settings.zapierUrl.replace('https://hooks.zapier.com/hooks/catch/', 'hooks.zapier.com/hooks/catch/')
+      : 'not configured — open ⚙ Settings';
   } catch(e) {}
 }
 
 function saveSettings() {
-  settings.exportFilename = document.getElementById('export-filename').value || 'MVTA_Document_ID_Live.csv';
+  settings.exportFilename = (document.getElementById('export-filename') || {}).value || 'MVTA_Document_ID_Master.xlsx';
   try { localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(settings)); } catch(e) {}
+}
+
+function saveAllSettings() {
+  settings.zapierUrl      = document.getElementById('cfg-zapier').value.trim();
+  settings.spFileUri      = document.getElementById('cfg-sp-uri').value.trim();
+  settings.intakeFormUrl  = document.getElementById('cfg-intake-form').value.trim();
+  settings.intakeQueueUrl = document.getElementById('cfg-intake-queue').value.trim();
+  settings.exportFilename = (document.getElementById('export-filename') || {}).value || 'MVTA_Document_ID_Master.xlsx';
+  try {
+    localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(settings));
+    const ep = document.getElementById('zapier-endpoint-display');
+    if (ep) ep.textContent = settings.zapierUrl
+      ? settings.zapierUrl.replace('https://hooks.zapier.com/hooks/catch/', 'hooks.zapier.com/hooks/catch/')
+      : 'not configured';
+    showAlert('Settings saved. Never share your screen while this panel is open.', 'success');
+    document.getElementById('settings-panel').style.display = 'none';
+    syncFromSharePoint(false);
+  } catch(e) { showAlert('Could not save: ' + e.message, 'error'); }
+}
+
+function toggleSettings() {
+  const panel = document.getElementById('settings-panel');
+  const isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? '' : 'none';
+  if (isHidden) {
+    document.getElementById('cfg-zapier').value       = settings.zapierUrl || '';
+    document.getElementById('cfg-sp-uri').value       = settings.spFileUri || '';
+    document.getElementById('cfg-intake-form').value  = settings.intakeFormUrl || '';
+    document.getElementById('cfg-intake-queue').value = settings.intakeQueueUrl || '';
+  }
 }
 
 // ── Excel Export (SheetJS) ─────────────────────────────────────────────────
@@ -1332,6 +1418,7 @@ function downloadScript(elementId, filename, mimeType) {
 
 
 async function testZapier() {
+  if (!ZAPIER_WEBHOOK()) { showAlert('Zapier URL not configured — open Settings.', 'warn'); return; }
   const testRecord = {
     document_id: 'TEST-000-00', document_title: 'Zapier Connection Test — DELETE ME',
     document_type: 'SOP', department: 'Information Technology',
@@ -1360,14 +1447,16 @@ async function syncAllUnsynced() {
 }
 
 
-const ZAPIER_WEBHOOK = 'https://hooks.zapier.com/hooks/catch/1838006/42ht8f0/';
+const ZAPIER_WEBHOOK = () => settings.zapierUrl || '';
 
 async function postToZapier(record) {
   const statusEl = document.getElementById('zapier-status');
   statusEl.className = 'alert alert-info show';
   statusEl.textContent = `⏳ Posting ${record.document_id} to SharePoint via Zapier...`;
   try {
-    const resp = await fetch(ZAPIER_WEBHOOK, {
+    const webhookUrl = ZAPIER_WEBHOOK();
+  if (!webhookUrl) { statusEl.className = 'alert alert-warn show'; statusEl.textContent = 'Zapier webhook URL not configured — open Settings to add it.'; setTimeout(() => { statusEl.className = 'alert'; }, 6000); return; }
+  const resp = await fetch(webhookUrl, {
       method: 'POST',
       mode: 'no-cors',  // Zapier webhooks don't return CORS headers
       headers: { 'Content-Type': 'application/json' },
